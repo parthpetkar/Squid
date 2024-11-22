@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="portal-card">
+            <h1>Admin Dashboard</h1>
+            <form action="/admin/block-site" method="POST">
+                <label for="block_url">Block Site URL</label>
+                <input type="text" id="block_url" name="block_url" placeholder="https://example.com" required>
+                <button type="submit">Block Site</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
