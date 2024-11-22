@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Captive Portal</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="portal-card">
+            <h1>Welcome to Our Network</h1>
+            <p>Please sign in to access the internet.</p>
+            <form id="portal_form" action="/login" method="POST">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter your username" required>
+                
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                
+                <button type="submit">Sign In</button>
+            </form>
+            <p class="terms">
+                By signing in, you agree to our 
+                <a href="#" target="_blank">Terms & Conditions</a>.
+            </p>
+            <div id="error-message" class="hidden"></div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
