@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 const ALLOWED_USERS_FILE = 'D:/Squid/etc/squid/allowed_users.txt';
 const BLOCKED_FILE = 'D:/Squid/etc/squid/blocked_domains.txt';
+const ACCESS_LOG_FILE = 'D:/Squid/var/log/squid/access.log';
 
 // Middleware for parsing form data and managing sessions
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -87,6 +88,25 @@ const logIpAndRestartSquid = (ip) => {
     }
 };
 
+// Function to read and remove old IPs from allowed_users.txt
+const removeOldIPs = () => {
+    if (!fs.existsSync(ALLOWED_USERS_FILE)) return;
+
+    const now = Date.now();
+    const twoHours = 2 * 60 * 60 * 1000;
+
+    const lines = fs.readFileSync(ALLOWED_USERS_FILE, 'utf-8').split('\n').filter(Boolean);
+    const updatedLines = lines.filter((line) => {
+        const [ip, timestamp] = line.split(' ');
+        return now - parseInt(timestamp, 10) <= twoHours;
+    });
+
+    fs.writeFileSync(ALLOWED_USERS_FILE, updatedLines.join('\n'), 'utf-8');
+};
+
+// Periodically remove old IPs every 5 minutes
+setInterval(removeOldIPs, 12 * 60 * 60 * 1000);
+
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/public/home.html');
@@ -121,6 +141,32 @@ app.get('/admin/dashboard', (req, res) => {
     }
 });
 
+app.get('/admin/logs', (req, res) => {
+    if (req.session.user && req.session.user.role === 'admin') {
+        if (fs.existsSync(ACCESS_LOG_FILE)) {
+            const logs = fs
+                .readFileSync(ACCESS_LOG_FILE, 'utf-8')
+                .split('\n')
+                .filter(Boolean)
+                .map((log) => {
+                    const parts = log.split(' ');
+                    return {
+                        time: new Date(parseFloat(parts[0]) * 1000).toLocaleString(),
+                        clientIp: parts[2],
+                        action: parts[3],
+                        url: parts[6],
+                    };
+                });
+            res.json(logs);
+        } else {
+            res.status(404).json({ error: 'Log file not found' });
+        }
+    } else {
+        res.status(403).json({ error: 'Forbidden' });
+    }
+});
+
+// Admin Dashboard - Add Blocked Site
 app.post('/admin/block-site', (req, res) => {
     if (req.session.user && req.session.user.role === 'admin') {
         const { block_url } = req.body;
@@ -132,15 +178,37 @@ app.post('/admin/block-site', (req, res) => {
             if (!blockedSites.includes(domain)) {
                 fs.appendFileSync(BLOCKED_FILE, `${domain}\n`);
                 console.log(`Domain ${domain} added to blocked_domains.txt`);
-                restartSquid();
-                res.send('<h1>Site Blocked</h1>');
-            } else res.send('<h1>Site Already Blocked</h1>');
-        } else res.send('<h1>Invalid URL</h1>');
+                res.json({ success: true, message: `Blocked ${domain}` });
+            } else {
+                res.json({ success: false, message: `Domain ${domain} is already blocked` });
+            }
+        } else {
+            res.status(400).json({ error: 'Invalid URL' });
+        }
     } else {
-        res.status(403).send('<h1>Forbidden</h1>');
+        res.status(403).json({ error: 'Forbidden' });
     }
 });
 
+app.get('/packets', (req, res) => {
+    exec('tshark -i 1 -c 10 -T fields -e ip.src -e ip.dst -e tcp.port', (error, stdout, stderr) => {
+        if (error || stderr) {
+            console.error('Error fetching packets:', error || stderr);
+            return res.status(500).json({ message: 'Error fetching packets' });
+        }
+
+        // Parse TShark output
+        const packets = stdout.split('\n').map(line => {
+            const [srcIp, dstIp, port] = line.split('\t');
+            return { srcIp, dstIp, port };
+        }).filter(packet => packet.srcIp && packet.dstIp);
+
+        // Send the JSON response
+        res.json(packets);
+    });
+});
+
+
 app.listen(PORT, () => {
-    console.log(`Captive Portal running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
